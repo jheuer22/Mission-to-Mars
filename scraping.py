@@ -1,33 +1,4 @@
-# from flask import Flask, render_template, redirect, url_for
-# from flask_pymongo import PyMongo
-# import scraping
 
-# app = Flask(__name__)
-
-# # Use flask_pymongo to set up mongo connection
-# app.config["MONGO_URI"] = "mongodb://localhost:27017/mars_app"
-# mongo = PyMongo(app)
-
-# @app.route("/")
-# def index():
-#    mars = mongo.db.mars.find_one()
-#    return render_template("index.html", mars=mars)
-
-
-# @app.route("/scrape")   
-# def scrape():
-#    mars = mongo.db.mars
-#    mars_data = scraping.scrape_all()
-#    mars.update({}, mars_data, upsert=True)
-#    return redirect('/', code=302)
-
-# if __name__ == "__main__":
-#    app.run()
-
-# from flask import Flask, render_template, redirect, url_for
-# from flask_pymongo import PyMongo
-# # from import scraping
-# import datetime as dt
 
 # Import Splinter, BeautifulSoup, and Pandas
 from splinter import Browser
@@ -35,34 +6,6 @@ from bs4 import BeautifulSoup as soup
 import pandas as pd
 import datetime as dt
 from webdriver_manager.chrome import ChromeDriverManager
-
-def scrape_all():
-    # Initiate headless driver for deployment
-    executable_path = {'executable_path': ChromeDriverManager().install()}
-    browser = Browser('chrome', **executable_path, headless=True)
-    # When scraping, the "headless" browsing session is when a browser is run without the users seeing it at all. 
-    #While we can see the word "browser" here twice, one is the name of the variable passed into the 
-    # function and the other is the name of a parameter. 
-    # Coding guidelines do not require that these match, even though they do in our current code.
-
-    news_title, news_paragraph = mars_news(browser)
-
-    # Run all scraping functions and store results in dictionary
-    data = {
-        "news_title": news_title,
-        "news_paragraph": news_paragraph,
-        "featured_image": featured_image(browser),
-        "facts": mars_facts(),
-        "last_modified": dt.datetime.now()
-    }
-    #This dictionary does two things: It runs all of the functions we've created—featured_image(browser),
-    #  for example—and it also stores all of the results. 
-    #We're also adding the date the code was run last by adding "last_modified": dt.datetime.now(). 
-    
-    # Stop webdriver and return data
-    browser.quit()
-    return data
-
 
 def mars_news(browser):
 
@@ -123,7 +66,7 @@ def featured_image(browser):
 
    return img_url
 
-
+#Scrape mars factis into table
 def mars_facts():
 
    try: 
@@ -139,6 +82,70 @@ def mars_facts():
    #Convert dataFrame tinto html format, add bootstrap 
    return df.to_html()
 
+
+#Scrape Hemisphere data and images 
+
+def hemisphere(browser):
+
+   url = "https://astrogeology.usgs.gov/search/results?q=hemisphere+enhanced&k1=target&v1=Mars"
+   browser.visit(url)
+   
+   # 2. Create a list to hold the images and titles.
+   hemisphere_image_urls = []
+
+   # Get a List of All the Hemispheres
+   links = browser.find_by_css("a.product-item h3")
+   for item in range(len(links)):
+      hemispheres = {}
+      
+      # Find Element on Each Loop to Avoid a Stale Element Exception
+      browser.find_by_css("a.product-item h3")[item].click()
+      
+      # Find Sample Image Anchor Tag & Extract <href>
+      sample_element = browser.find_by_text("Sample").first
+      hemispheres["img_url"] = sample_element["href"]
+      
+      # Get Hemisphere Title
+      hemispheres["title"] = browser.find_by_css("h2.title").text
+      
+      # Append Hemisphere Object to List
+      hemisphere_image_urls.append(hemispheres)
+      
+      # Navigate Backwards
+      browser.back()
+   return hemisphere_image_urls
+
+
+def scrape_all():
+    # Initiate headless driver for deployment
+   executable_path = {'executable_path': ChromeDriverManager().install()}
+   browser = Browser('chrome', **executable_path, headless=True)
+    # When scraping, the "headless" browsing session is when a browser is run without the users seeing it at all. 
+    #While we can see the word "browser" here twice, one is the name of the variable passed into the 
+    # function and the other is the name of a parameter. 
+    # Coding guidelines do not require that these match, even though they do in our current code.
+   hemisphere_image_urls = hemisphere(browser)
+   news_title, news_paragraph = mars_news(browser)
+
+    # Run all scraping functions and store results in dictionary
+   data = {
+      "news_title": news_title,
+      "news_paragraph": news_paragraph,
+      "featured_image": featured_image(browser),
+      "facts": mars_facts(),
+      "hemispheres": hemisphere_image_urls,
+      "last_modified": dt.datetime.now()
+        
+   }
+
+     
+    #This dictionary does two things: It runs all of the functions we've created—featured_image(browser),
+    #  for example—and it also stores all of the results. 
+    #We're also adding the date the code was run last by adding "last_modified": dt.datetime.now(). 
+    
+    # Stop webdriver and return data
+   browser.quit()
+   return data
 
 if __name__ == "__main__":
     # If running as script, print scraped data
